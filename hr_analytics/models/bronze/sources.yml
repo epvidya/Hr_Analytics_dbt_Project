@@ -1,0 +1,152 @@
+# models/staging/sources.yml
+
+version: 2
+
+sources:
+  - name: staging
+    database: hr_analytics_dbt
+    schema: staging
+    description: "Raw Snowpipe landing zone. CSV loaded directly from S3. All columns VARCHAR. No tests — whatever arrives from S3 lands here untouched."
+
+    tables:
+      - name: hr_data_raw
+        description: >
+          Raw HR employee data landed from S3 via Snowpipe.
+          All 41 columns are VARCHAR regardless of actual data type.
+          Three date columns added vs original CSV: join_date, exit_date, snapshot_date.
+          Known dirty value: business_travel contains both TravelRarely and Travel_Rarely.
+          Constant columns present: employee_count always 1, over_18 always Y, standard_hours always 80.
+          exit_date is NULL for active employees — only populated when attrition = Yes.
+
+        columns:
+          - name: emp_id
+            description: "Employee unique identifier. Natural key. Format RM001 to RM999."
+
+          - name: employee_number
+            description: "Numeric employee identifier. Different from emp_id."
+
+          - name: age
+            description: "Employee age as VARCHAR. Range 18 to 60. Cast to INT in silver."
+
+          - name: age_group
+            description: "Age bracket as VARCHAR. Values: 18-25, 26-35, 36-45, 46-55, 55+"
+
+          - name: gender
+            description: "Employee gender as VARCHAR. Values: Male, Female."
+
+          - name: marital_status
+            description: "Marital status as VARCHAR. Values: Single, Married, Divorced."
+
+          - name: over_18
+            description: "Always Y. Constant column. Dropped in silver."
+
+          - name: education
+            description: "Education level code as VARCHAR. Values: 1-5. Decoded to label in silver."
+
+          - name: education_field
+            description: "Field of education as VARCHAR. Values: Life Sciences, Medical, Marketing, Technical Degree, Other, Human Resources."
+
+          - name: department
+            description: "Employee department as VARCHAR. Values: Research & Development, Sales, Human Resources."
+
+          - name: job_role
+            description: "Job role title as VARCHAR. Values: Laboratory Technician, Research Scientist, Sales Executive etc."
+
+          - name: job_level
+            description: "Job level as VARCHAR. Values: 1-5. Used with job_role to build dim_job_role in gold."
+
+          - name: business_travel
+            description: >
+              Travel frequency as VARCHAR.
+              DIRTY SOURCE — contains both TravelRarely and Travel_Rarely meaning the same thing.
+              Standardised to Travel_Rarely in silver. No test here — dirty values are expected.
+
+          - name: join_date
+            description: "Date employee joined the company as VARCHAR. Format DD-MM-YYYY. Cast to DATE in silver. Range 2010 to 2022."
+
+          - name: exit_date
+            description: "Date employee left the company as VARCHAR. Format DD-MM-YYYY. NULL for active employees. Only populated when attrition = Yes."
+
+          - name: snapshot_date
+            description: "Point in time this record represents as VARCHAR. Format DD-MM-YYYY. All rows 2024-01-01 in current dataset."
+
+          - name: attrition
+            description: "Whether employee left as VARCHAR. Values: Yes, No."
+
+          - name: overtime
+            description: "Whether employee works overtime as VARCHAR. Values: Yes, No."
+
+          - name: monthly_income
+            description: "Monthly income as VARCHAR. Cast to INT in silver. Range 1009 to 19999."
+
+          - name: salary_slab
+            description: "Salary band as VARCHAR. Values: Upto 5k, 5k-10k, 10k-15k, 15k+"
+
+          - name: daily_rate
+            description: "Daily rate as VARCHAR. Cast to INT in silver. Range 102 to 1499."
+
+          - name: hourly_rate
+            description: "Hourly rate as VARCHAR. Cast to INT in silver. Range 30 to 100."
+
+          - name: monthly_rate
+            description: "Monthly rate as VARCHAR. Cast to INT in silver. Range 2094 to 26999."
+
+          - name: percent_salary_hike
+            description: "Salary hike percentage as VARCHAR. Cast to INT in silver. Range 11 to 25."
+
+          - name: stock_option_level
+            description: "Stock option level as VARCHAR. Values: 0, 1, 2, 3."
+
+          - name: performance_rating
+            description: "Performance rating as VARCHAR. Values: 1-4."
+
+          - name: environment_satisfaction
+            description: "Environment satisfaction rating as VARCHAR. Values: 1-4. Per-employee survey score — goes to fact table not dim."
+
+          - name: job_satisfaction
+            description: "Job satisfaction rating as VARCHAR. Values: 1-4. Per-employee survey score — goes to fact table not dim."
+
+          - name: relationship_satisfaction
+            description: "Relationship satisfaction rating as VARCHAR. Values: 1-4. Per-employee survey score — goes to fact table not dim."
+
+          - name: work_life_balance
+            description: "Work life balance rating as VARCHAR. Values: 1-4. Per-employee survey score — goes to fact table not dim."
+
+          - name: job_involvement
+            description: "Job involvement rating as VARCHAR. Values: 1-4. Per-employee survey score — goes to fact table not dim."
+
+          - name: distance_from_home
+            description: "Distance from home in miles as VARCHAR. Cast to INT in silver. Range 1 to 29."
+
+          - name: num_companies_worked
+            description: "Number of previous companies as VARCHAR. Cast to INT in silver. Range 0 to 9."
+
+          - name: total_working_years
+            description: "Total years of work experience as VARCHAR. Cast to INT in silver. Range 0 to 40."
+
+          - name: years_at_company
+            description: "Years at current company as VARCHAR. Pre-calculated by source system. Cast to INT in silver."
+
+          - name: years_in_current_role
+            description: "Years in current role as VARCHAR. Cast to INT in silver. Range 0 to 18."
+
+          - name: years_since_last_promotion
+            description: "Years since last promotion as VARCHAR. Cast to INT in silver. Range 0 to 15."
+
+          - name: years_with_curr_manager
+            description: "Years with current manager as VARCHAR. Cast to INT in silver. Range 0 to 17."
+
+          - name: training_times_last_year
+            description: "Number of training sessions last year as VARCHAR. Cast to INT in silver. Range 0 to 6."
+
+          - name: employee_count
+            description: "Always 1. Constant column. Dropped in silver."
+
+          - name: standard_hours
+            description: "Always 80. Constant column. Dropped in silver."
+
+          - name: _source_file_name
+            description: "S3 file path injected by COPY INTO using METADATA$FILENAME. Not in original CSV."
+
+          - name: _load_timestamp
+            description: "Timestamp when row was loaded into staging. Injected by COPY INTO using CURRENT_TIMESTAMP(). Not in original CSV."

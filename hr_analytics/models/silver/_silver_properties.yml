@@ -1,0 +1,279 @@
+# models/silver/schema.yml
+# Silver layer — cleaned, typed, standardised
+# Tests here enforce what the data SHOULD look like after cleaning
+# If any test fails here it means the silver transformation logic broke
+# Fix the transformation, not the test
+
+version: 2
+
+models:
+  - name: hr__data_cleaned
+    description: >
+      Cleaned and typed HR employee data.
+      All VARCHAR columns from bronze cast to correct types.
+      business_travel standardised — TravelRarely merged into Travel_Rarely.
+      Constant columns dropped — employee_count, over_18, standard_hours.
+      Rows with null emp_id or zero monthly_income rejected.
+      education_level decoded to label.
+      attrition and overtime converted from Yes/No string to boolean.
+
+    columns:
+
+      # -------------------------------------------------------
+      # Primary key
+      # -------------------------------------------------------
+      - name: emp_id
+        description: "Employee unique identifier. Natural key. Not null enforced — rows without this were rejected in transformation."
+        tests:
+          - not_null
+          - unique              # one row per employee in silver
+
+      # -------------------------------------------------------
+      # Employee demographics
+      # -------------------------------------------------------
+      - name: age
+        description: "Employee age as INT. Cast from VARCHAR in bronze."
+        tests:
+          - not_null
+
+      - name: age_group
+        description: "Age bracket."
+        tests:
+          - accepted_values:
+              values: ['18-25', '26-35', '36-45', '46-55', '55+']
+
+      - name: gender
+        description: "Employee gender."
+        tests:
+          - accepted_values:
+              values: ['Male', 'Female']
+
+      - name: marital_status
+        description: "Marital status."
+        tests:
+          - accepted_values:
+              values: ['Single', 'Married', 'Divorced']
+
+      # -------------------------------------------------------
+      # Education
+      # -------------------------------------------------------
+      - name: education_level
+        description: "Education level as INT 1-5."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4, 5]     # integers — not strings like bronze
+
+      - name: education_level_label
+        description: "Decoded education label. Derived from education_level in silver transformation."
+        tests:
+          - accepted_values:
+              values: ['Below College', 'College', 'Bachelor', 'Master', 'Doctor']
+
+      - name: education_field
+        description: "Field of education."
+        tests:
+          - not_null
+
+      # -------------------------------------------------------
+      # Job and organisation
+      # -------------------------------------------------------
+      - name: job_role
+        description: "Job role title."
+        tests:
+          - not_null
+          - accepted_values:
+              values:
+                - 'Healthcare Representative'
+                - 'Human Resources'
+                - 'Laboratory Technician'
+                - 'Manager'
+                - 'Manufacturing Director'
+                - 'Research Director'
+                - 'Research Scientist'
+                - 'Sales Executive'
+                - 'Sales Representative'
+
+      - name: job_level
+        description: "Job level as INT 1-5."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4, 5]
+
+      - name: department
+        description: "Employee department."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Human Resources', 'Research & Development', 'Sales']
+
+      - name: business_travel
+        description: >
+          Standardised travel frequency.
+          TravelRarely from bronze is merged into Travel_Rarely here.
+          If TravelRarely appears in this column the silver cleaning logic broke.
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Travel_Rarely', 'Travel_Frequently', 'Non-Travel']
+              # TravelRarely deliberately excluded — should never appear after cleaning
+
+      # -------------------------------------------------------
+      # Compensation
+      # -------------------------------------------------------
+      - name: monthly_income
+        description: "Monthly income as INT. Rows with zero or null income rejected in transformation."
+        tests:
+          - not_null
+
+      - name: salary_slab
+        description: "Salary band."
+        tests:
+          - accepted_values:
+              values: ['Upto 5k', '5k-10k', '10k-15k', '15k+']
+
+      - name: daily_rate
+        description: "Daily rate as INT."
+        tests:
+          - not_null
+
+      - name: hourly_rate
+        description: "Hourly rate as INT."
+        tests:
+          - not_null
+
+      - name: monthly_rate
+        description: "Monthly rate as INT."
+        tests:
+          - not_null
+
+      - name: percent_salary_hike
+        description: "Salary hike percentage as INT."
+        tests:
+          - not_null
+
+      - name: stock_option_level
+        description: "Stock option level as INT 0-3."
+        tests:
+          - accepted_values:
+              values: [0, 1, 2, 3]
+
+      # -------------------------------------------------------
+      # Survey scores — per employee, go to fact table not dims
+      # -------------------------------------------------------
+      - name: job_satisfaction
+        description: "Job satisfaction rating 1-4. Per-employee survey score. Goes to fact_employee_snapshot not a dimension."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4]
+
+      - name: environment_satisfaction
+        description: "Environment satisfaction rating 1-4. Per-employee survey score."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4]
+
+      - name: relationship_satisfaction
+        description: "Relationship satisfaction rating 1-4. Per-employee survey score."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4]
+
+      - name: work_life_balance
+        description: "Work life balance rating 1-4. Per-employee survey score."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4]
+
+      - name: job_involvement
+        description: "Job involvement rating 1-4. Per-employee survey score. Not a property of the job role."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4]
+
+      - name: performance_rating
+        description: "Performance rating 1-4."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4]
+
+      # -------------------------------------------------------
+      # Flags — converted from Yes/No string to boolean
+      # -------------------------------------------------------
+      - name: attrition_flag
+        description: "Whether employee left. Converted from Yes/No string in bronze to boolean here."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [true, false]
+
+      - name: overtime_flag
+        description: "Whether employee works overtime. Converted from Yes/No string in bronze to boolean here."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [true, false]
+
+      # -------------------------------------------------------
+      # Tenure measures
+      # -------------------------------------------------------
+      - name: total_working_years
+        description: "Total years of work experience as INT."
+        tests:
+          - not_null
+
+      - name: num_companies_worked
+        description: "Number of previous companies as INT."
+        tests:
+          - not_null
+
+      - name: years_at_company
+        description: "Years at current company as INT."
+        tests:
+          - not_null
+
+      - name: years_in_current_role
+        description: "Years in current role as INT."
+        tests:
+          - not_null
+
+      - name: years_since_last_promotion
+        description: "Years since last promotion as INT."
+        tests:
+          - not_null
+
+      - name: years_with_curr_manager
+        description: "Years with current manager as INT."
+        tests:
+          - not_null
+
+      - name: training_times_last_year
+        description: "Number of training sessions attended last year as INT."
+        tests:
+          - not_null
+
+      - name: distance_from_home
+        description: "Distance from home as INT."
+        tests:
+          - not_null
+
+      # -------------------------------------------------------
+      # Pipeline metadata — carried from bronze
+      # -------------------------------------------------------
+      - name: _source_file_name
+        description: "S3 file path from Snowpipe. Carried from bronze for lineage tracking."
+
+      - name: _load_timestamp
+        description: "Snowpipe load timestamp from bronze."
+
+      - name: _silver_created_at
+        description: "Timestamp when this row was written to silver."
+        tests:
+          - not_null

@@ -1,0 +1,5 @@
+stock_option_level,stock_option_label,stock_option_description
+0,None,No stock options granted
+1,Low,Minimal stock options
+2,Medium,Moderate stock options
+3,High,Significant stock options granted

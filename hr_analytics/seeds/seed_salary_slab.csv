@@ -1,0 +1,5 @@
+salary_slab,salary_slab_min,salary_slab_max
+Upto 5k,0,5000
+5k-10k,5001,10000
+10k-15k,10001,15000
+15k+,15001,999999

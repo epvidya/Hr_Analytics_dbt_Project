@@ -1,0 +1,231 @@
+# models/bronze/__bronze_properties.yml
+# Bronze layer — generic structural tests only
+# Source: staging.hr_raw (raw Snowpipe landing)
+# Tests here: not_null on columns that would break downstream if missing
+# No accepted_values tests — value validation is silver's job
+
+version: 2
+
+models:
+  - name: bronze_hr_data_raw
+    description: >
+      Bronze layer copy of staging.hr_raw.
+      All columns remain VARCHAR — no type casting here.
+      Generic not_null tests applied on columns that are critical
+      for downstream joins and transformations.
+      Value cleaning and type casting happens in silver.
+
+    config:
+      store_failures: true
+      schema: test_failures
+      
+    columns:
+
+      - name: emp_id
+        description: "Employee unique identifier. Natural key. Pipeline cannot function without this."
+        tests:
+          - not_null
+
+      - name: employee_number
+        description: "Numeric employee identifier as VARCHAR."
+
+      - name: age
+        description: "Employee age as VARCHAR. Cast to INT in silver."
+        tests:
+          - not_null
+
+      - name: age_group
+        description: "Age bracket as VARCHAR. Values: 18-25, 26-35, 36-45, 46-55, 55+"
+
+      - name: gender
+        description: "Employee gender as VARCHAR."
+        tests:
+          - not_null
+
+      - name: marital_status
+        description: "Marital status as VARCHAR. Values: Single, Married, Divorced."
+        tests:
+          - not_null
+
+      - name: over_18
+        description: "Always Y. Constant column. Dropped in silver."
+
+      - name: education
+        description: "Education level code as VARCHAR. Values 1-5. Decoded to label in silver."
+        tests:
+          - not_null
+
+      - name: education_field
+        description: "Field of education as VARCHAR."
+        tests:
+          - not_null
+
+      - name: department
+        description: "Employee department as VARCHAR. Critical for dim_org join in gold."
+        tests:
+          - not_null
+
+      - name: job_role
+        description: "Job role title as VARCHAR. Critical for dim_job_role join in gold."
+        tests:
+          - not_null
+
+      - name: job_level
+        description: "Job level as VARCHAR. Used with job_role to build dim_job_role in gold."
+        tests:
+          - not_null
+
+      - name: business_travel
+        description: >
+          Travel frequency as VARCHAR.
+          DIRTY SOURCE — TravelRarely and Travel_Rarely mean the same thing.
+          Standardised in silver. Not_null only — value cleaning is not bronze's job.
+        tests:
+          - not_null
+
+      - name: join_date
+        description: "Date employee joined the company as VARCHAR. Format YYYY-MM-DD. Critical for tenure calculation in silver."
+        tests:
+          - not_null
+
+      - name: exit_date
+        description: >
+          Date employee left as VARCHAR. Format YYYY-MM-DD.
+          NULL for active employees — no not_null test here.
+          Only populated when attrition = Yes.
+
+      - name: snapshot_date
+        description: "Snapshot period as VARCHAR. Format YYYY-MM-DD. Critical for dim_date join in gold."
+        tests:
+          - not_null
+
+      - name: attrition
+        description: "Whether employee left as VARCHAR. Values: Yes, No."
+        tests:
+          - not_null
+
+      - name: overtime
+        description: "Whether employee works overtime as VARCHAR. Values: Yes, No."
+        tests:
+          - not_null
+
+      - name: monthly_income
+        description: "Monthly income as VARCHAR. Cast to INT in silver."
+        tests:
+          - not_null
+
+      - name: salary_slab
+        description: "Salary band as VARCHAR. Values: Upto 5k, 5k-10k, 10k-15k, 15k+"
+        tests:
+          - not_null
+
+      - name: daily_rate
+        description: "Daily rate as VARCHAR. Cast to INT in silver."
+        tests:
+          - not_null
+
+      - name: hourly_rate
+        description: "Hourly rate as VARCHAR. Cast to INT in silver."
+        tests:
+          - not_null
+
+      - name: monthly_rate
+        description: "Monthly rate as VARCHAR. Cast to INT in silver."
+        tests:
+          - not_null
+
+      - name: percent_salary_hike
+        description: "Salary hike percentage as VARCHAR. Cast to INT in silver."
+        tests:
+          - not_null
+
+      - name: stock_option_level
+        description: "Stock option level as VARCHAR. Values: 0, 1, 2, 3."
+        tests:
+          - not_null
+
+      - name: performance_rating
+        description: "Performance rating as VARCHAR. Values: 1-4."
+        tests:
+          - not_null
+
+      - name: environment_satisfaction
+        description: "Environment satisfaction rating as VARCHAR. Values: 1-4. Goes to fact table not dim."
+        tests:
+          - not_null
+
+      - name: job_satisfaction
+        description: "Job satisfaction rating as VARCHAR. Values: 1-4. Goes to fact table not dim."
+        tests:
+          - not_null
+
+      - name: relationship_satisfaction
+        description: "Relationship satisfaction rating as VARCHAR. Values: 1-4. Goes to fact table not dim."
+        tests:
+          - not_null
+
+      - name: work_life_balance
+        description: "Work life balance rating as VARCHAR. Values: 1-4. Goes to fact table not dim."
+        tests:
+          - not_null
+
+      - name: job_involvement
+        description: "Job involvement rating as VARCHAR. Values: 1-4. Goes to fact table not dim."
+        tests:
+          - not_null
+
+      - name: distance_from_home
+        description: "Distance from home as VARCHAR. Cast to INT in silver."
+        tests:
+          - not_null
+
+      - name: num_companies_worked
+        description: "Number of previous companies as VARCHAR. Cast to INT in silver."
+        tests:
+          - not_null
+
+      - name: total_working_years
+        description: "Total years of work experience as VARCHAR. Cast to INT in silver."
+        tests:
+          - not_null
+
+      - name: years_at_company
+        description: "Years at current company as VARCHAR. Pre-calculated by source system."
+        tests:
+          - not_null
+
+      - name: years_in_current_role
+        description: "Years in current role as VARCHAR. Cast to INT in silver."
+        tests:
+          - not_null
+
+      - name: years_since_last_promotion
+        description: "Years since last promotion as VARCHAR. Cast to INT in silver."
+        tests:
+          - not_null
+
+      - name: years_with_curr_manager
+        description: "Years with current manager as VARCHAR. Cast to INT in silver."
+        tests:
+          - not_null
+
+      - name: training_times_last_year
+        description: "Number of training sessions last year as VARCHAR. Cast to INT in silver."
+        tests:
+          - not_null
+
+      - name: employee_count
+        description: "Always 1. Constant column. Dropped in silver."
+
+      - name: standard_hours
+        description: "Always 80. Constant column. Dropped in silver."
+
+      - name: _source_file_name
+        description: "S3 file path injected by COPY INTO using METADATA$FILENAME. Not in original CSV."
+        tests:
+          - not_null
+
+      - name: _load_timestamp
+        description: "Load timestamp injected by COPY INTO using CURRENT_TIMESTAMP(). Not in original CSV."
+        tests:
+          - not_null

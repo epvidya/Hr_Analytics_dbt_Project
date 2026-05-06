@@ -1,0 +1,4 @@
+business_travel,travel_label,travel_description
+Non-Travel,No Travel,Employee does not travel for work
+Travel_Rarely,Rarely,Employee travels occasionally for work
+Travel_Frequently,Frequently,Employee travels often for work
