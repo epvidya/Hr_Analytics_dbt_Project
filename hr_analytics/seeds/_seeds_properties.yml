@@ -1,0 +1,244 @@
+# seeds/_seed_properties.yml
+# All seed tables for HR Analytics project
+# Seeds are static reference/lookup tables loaded via dbt seed
+# They validate allowed values in silver via INNER JOIN
+# Run: dbt seed to load all seeds into hr_analytics_dbt.seeds schema
+
+version: 2
+
+seeds:
+
+  # -------------------------------------------------------
+  # EXISTING SEEDS
+  # -------------------------------------------------------
+
+  - name: seed_education_level
+    description: >
+      Lookup for education level codes 1-5.
+      Joined in silver to decode education column to label.
+      Static reference — never changes.
+    columns:
+      - name: education_level
+        description: "Numeric code 1-5. Matches education column in bronze."
+        tests:
+          - not_null
+          - unique
+      - name: education_label
+        description: "Human readable label. Values: Below College, College, Bachelor, Master, Doctor."
+        tests:
+          - not_null
+          - unique
+      - name: education_description
+        description: "Full description of the education level."
+        tests:
+          - not_null
+
+  - name: seed_rating_scale
+    description: >
+      Shared 1-4 rating scale used by six columns —
+      job_satisfaction, environment_satisfaction,
+      relationship_satisfaction, work_life_balance,
+      job_involvement, performance_rating.
+      Joined six times in silver with six different aliases.
+      Static reference — never changes.
+    columns:
+      - name: rating_value
+        description: "Numeric rating 1-4. Primary key."
+        tests:
+          - not_null
+          - unique
+      - name: rating_label
+        description: "Human readable label. Values: Low, Medium, High, Very High."
+        tests:
+          - not_null
+          - unique
+      - name: rating_description
+        description: "Description of what the rating means."
+        tests:
+          - not_null
+
+  - name: seed_job_level
+    description: >
+      Lookup for job level codes 1-5.
+      Joined in silver to decode job_level to label.
+      Used in gold to build job_role_level display column.
+      Static reference — never changes.
+    columns:
+      - name: job_level
+        description: "Numeric level 1-5. Matches job_level column in bronze."
+        tests:
+          - not_null
+          - unique
+      - name: job_level_label
+        description: "Human readable label. Values: Junior, Mid, Senior, Lead, Principal."
+        tests:
+          - not_null
+          - unique
+
+  - name: seed_salary_slab
+    description: >
+      Salary band definitions with min and max income ranges.
+      Joined in silver to validate salary_slab column.
+      Also used to verify monthly_income falls within correct band.
+      Static reference — changes only if company redefines salary bands.
+    columns:
+      - name: salary_slab
+        description: "Salary band label. Values: Upto 5k, 5k-10k, 10k-15k, 15k+"
+        tests:
+          - not_null
+          - unique
+      - name: salary_slab_min
+        description: "Minimum monthly income for this band."
+        tests:
+          - not_null
+      - name: salary_slab_max
+        description: "Maximum monthly income for this band."
+        tests:
+          - not_null
+
+  - name: seed_stock_option_level
+    description: >
+      Lookup for stock option level codes 0-3.
+      Joined in silver to decode stock_option_level to label.
+      Static reference — never changes.
+    columns:
+      - name: stock_option_level
+        description: "Numeric level 0-3. Matches stock_option_level column in bronze."
+        tests:
+          - not_null
+          - unique
+      - name: stock_option_label
+        description: "Human readable label. Values: None, Low, Medium, High."
+        tests:
+          - not_null
+          - unique
+      - name: stock_option_description
+        description: "Description of what the level means."
+        tests:
+          - not_null
+
+  - name: seed_business_travel
+    description: >
+      Lookup for standardised business travel values.
+      Joined in silver after CASE statement cleans dirty values.
+      Acts as final validation that only allowed travel values pass through.
+      Static reference — never changes.
+    columns:
+      - name: business_travel
+        description: "Standardised travel value. Values: Travel_Rarely, Travel_Frequently, Non-Travel."
+        tests:
+          - not_null
+          - unique
+      - name: travel_label
+        description: "Short human readable label."
+        tests:
+          - not_null
+      - name: travel_description
+        description: "Full description of travel frequency."
+        tests:
+          - not_null
+
+  # -------------------------------------------------------
+  # NEW SEEDS
+  # -------------------------------------------------------
+
+  - name: seed_employment_type
+    description: >
+      Lookup for employment type values.
+      Joined in silver to validate employment_type column.
+      is_full_time flag used in gold for FTE headcount calculation.
+      Static reference — changes only if company adds new employment types.
+    columns:
+      - name: employment_type
+        description: "Employment type label. Values: Full Time, Part Time, Contract."
+        tests:
+          - not_null
+          - unique
+      - name: employment_type_code
+        description: "Short code. Values: FT, PT, CT."
+        tests:
+          - not_null
+          - unique
+      - name: is_full_time
+        description: "Boolean flag. TRUE for Full Time only. Used for FTE headcount vs raw headcount."
+        tests:
+          - not_null
+
+  - name: seed_recruitment_source
+    description: >
+      Lookup for employee recruitment source values.
+      Joined in silver to validate recruitment_source column.
+      source_category and source_cost used in gold for
+      recruitment channel effectiveness analysis.
+      Static reference — changes if company adds new recruitment channels.
+    columns:
+      - name: recruitment_source
+        description: "Recruitment channel label. Values: LinkedIn, Employee Referral, Job Board, Campus Recruitment, Staffing Agency."
+        tests:
+          - not_null
+          - unique
+      - name: source_category
+        description: "Category of recruitment channel. Values: Digital, Internal, External, Direct."
+        tests:
+          - not_null
+      - name: source_cost
+        description: "Relative cost of recruitment channel. Values: Low, Medium, High."
+        tests:
+          - not_null
+
+  - name: seed_termination_reason
+    description: >
+      Lookup for employee termination reason values.
+      Joined in silver to validate termination_reason column.
+      NULL termination_reason rows (active employees) are excluded
+      from this join — LEFT JOIN used in silver for this column.
+      is_voluntary flag critical for voluntary vs involuntary attrition analysis.
+      Static reference — changes only if HR redefines exit categories.
+    columns:
+      - name: termination_reason
+        description: "Reason employee left. Values: Resigned, Better Opportunity, Personal Reasons, Involuntary Termination, Retirement."
+        tests:
+          - not_null
+          - unique
+      - name: reason_category
+        description: "High level category. Values: Voluntary, Involuntary."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Voluntary', 'Involuntary']
+      - name: is_voluntary
+        description: "Boolean flag. TRUE for voluntary departures. FALSE for involuntary termination."
+        tests:
+          - not_null
+
+  - name: seed_location
+    description: >
+      Lookup for employee work locations mapped to department,
+      state, region and cost center.
+      Joined in silver to validate location column and bring in
+      state and region for geographic analysis.
+      Note — cost_center is embedded here since location and
+      cost center are always paired. No separate cost_center seed needed.
+      Static reference — changes if company opens or closes offices.
+    columns:
+      - name: location
+        description: "City where employee works. 11 cities across 3 departments."
+        tests:
+          - not_null
+          - unique
+      - name: department
+        description: "Department that operates from this location."
+        tests:
+          - not_null
+      - name: state
+        description: "US state where city is located."
+        tests:
+          - not_null
+      - name: region
+        description: "US region. Values: Northeast, West, Southeast, Midwest, South, Southwest."
+        tests:
+          - not_null
+      - name: cost_center
+        description: "Budget code for this location. CC-RD-001, CC-SL-002, CC-HR-003."
+        tests:
+          - not_null

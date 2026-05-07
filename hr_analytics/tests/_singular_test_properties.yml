@@ -1,0 +1,38 @@
+# tests/_singular_test_properties.yml
+# Configuration for all singular tests in the tests/ folder
+# severity: warn — pipeline continues even if tests fail
+# Warnings surface anomalies for investigation without blocking gold models
+# Raise findings with HR data steward before changing rules or severity to error
+
+version: 2
+
+tests:
+
+  - name: assert_manager_id_rule
+    config:
+      severity: warn
+      description: >
+        Checks two manager hierarchy rules:
+        Rule 1 — Level 5 employees must have NULL manager_id.
+                 They are top of the org and have no manager above them.
+        Rule 2 — All other employees must have a non-null manager_id.
+                 Every non-Level 5 employee must report to someone.
+        A warning here means either:
+        1. A Level 5 employee was incorrectly assigned a manager in HRIS.
+        2. A non-Level 5 employee has no manager assigned — missing data.
+        Raise with HR data steward to verify reporting relationships in Workday.
+
+  - name: assert_managers_are_senior
+    config:
+      severity: warn
+      description: >
+        Checks that only Level 3 and above employees appear as managers.
+        Level 1 (Junior) and Level 2 (Mid) employees should not have
+        direct reports in a standard org hierarchy.
+        A warning here could mean:
+        1. Data entry error in HRIS — wrong manager assigned during onboarding.
+        2. Legitimate business exception — interim manager arrangement.
+        3. Business rule needs updating — company allows Mid level managers.
+        Raise with HR data steward to investigate before changing the rule.
+        Known exception: generated data may have one Level 2 manager due to
+        small department size — verify in production HRIS data.

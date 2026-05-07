@@ -1,0 +1,6 @@
+termination_reason,reason_category,is_voluntary
+Resigned,Voluntary,true
+Better Opportunity,Voluntary,true
+Personal Reasons,Voluntary,true
+Involuntary Termination,Involuntary,false
+Retirement,Voluntary,true

@@ -1,0 +1,12 @@
+location,department,state,region,cost_center
+Boston,Research & Development,Massachusetts,Northeast,CC-RD-001
+San Diego,Research & Development,California,West,CC-RD-001
+Seattle,Research & Development,Washington,West,CC-RD-001
+Raleigh,Research & Development,North Carolina,Southeast,CC-RD-001
+New York,Sales,New York,Northeast,CC-SL-002
+Chicago,Sales,Illinois,Midwest,CC-SL-002
+Dallas,Sales,Texas,South,CC-SL-002
+Atlanta,Sales,Georgia,Southeast,CC-SL-002
+Phoenix,Human Resources,Arizona,Southwest,CC-HR-003
+Denver,Human Resources,Colorado,West,CC-HR-003
+Austin,Human Resources,Texas,South,CC-HR-003

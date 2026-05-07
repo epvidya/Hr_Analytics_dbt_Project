@@ -1,56 +1,101 @@
-# models/silver/schema.yml
-# Silver layer — cleaned, typed, standardised
-# Tests here enforce what the data SHOULD look like after cleaning
-# If any test fails here it means the silver transformation logic broke
-# Fix the transformation, not the test
+# models/silver/_silver_properties.yml
+# Silver layer — cleaned, typed, validated
+# Three layers of tests on foreign key columns:
+#   not_null        → value exists
+#   accepted_values → value is in allowed list
+#   relationships   → value exists in referenced table/seed
+# Columns with expected NULLs (manager_id, exit_date etc) have no not_null test
 
 version: 2
 
 models:
-  - name: hr__data_cleaned
+  - name: silver_hr_cleaned
     description: >
-      Cleaned and typed HR employee data.
-      All VARCHAR columns from bronze cast to correct types.
-      business_travel standardised — TravelRarely merged into Travel_Rarely.
+      Silver layer — cleaned, typed and validated HR employee data.
+      One row per employee as of snapshot date 2024-01-01.
+      All VARCHAR columns cast to correct types.
+      business_travel standardised via CASE statement.
       Constant columns dropped — employee_count, over_18, standard_hours.
-      Rows with null emp_id or zero monthly_income rejected.
-      education_level decoded to label.
-      attrition and overtime converted from Yes/No string to boolean.
+      Rows with null emp_id, join_date, snapshot_date, age,
+      monthly_income or job_level rejected — go to quarantine.
+      Seed INNER JOINs enforce allowed values for all lookup columns.
+      termination_reason uses LEFT JOIN — NULL for active employees.
+      Enriched with decoded labels and flags from seed tables.
 
     columns:
 
       # -------------------------------------------------------
-      # Primary key
+      # Identity
       # -------------------------------------------------------
       - name: emp_id
-        description: "Employee unique identifier. Natural key. Not null enforced — rows without this were rejected in transformation."
+        description: "Employee unique identifier. Uppercased and trimmed."
         tests:
           - not_null
-          - unique              # one row per employee in silver
+          - unique
+
+      - name: employee_number
+        description: "Sequential numeric employee identifier as INT."
+        tests:
+          - not_null
+          - unique
+
+      - name: manager_id
+        description: "Manager employee ID. NULL for Level 5 employees."
+        tests:
+          - relationships:
+              to: ref('hr_cleaned')
+              field: emp_id
 
       # -------------------------------------------------------
-      # Employee demographics
+      # Personal details
+      # -------------------------------------------------------
+      - name: first_name
+        description: "Employee first name. INITCAP applied."
+        tests:
+          - not_null
+
+      - name: last_name
+        description: "Employee last name. INITCAP applied."
+        tests:
+          - not_null
+
+      - name: email
+        description: "Employee work email. Lowercased."
+        tests:
+          - not_null
+          - unique
+
+      - name: full_name
+        description: "Derived full name — first_name || last_name."
+        tests:
+          - not_null
+
+      # -------------------------------------------------------
+      # Demographics
       # -------------------------------------------------------
       - name: age
-        description: "Employee age as INT. Cast from VARCHAR in bronze."
+        description: "Employee age as INT. Range 22-58."
         tests:
           - not_null
 
       - name: age_group
         description: "Age bracket."
         tests:
+          - not_null
           - accepted_values:
               values: ['18-25', '26-35', '36-45', '46-55', '55+']
 
       - name: gender
-        description: "Employee gender."
+        description: "Employee gender. INITCAP applied."
         tests:
+          - not_null
           - accepted_values:
               values: ['Male', 'Female']
 
       - name: marital_status
-        description: "Marital status."
+        description: "Marital status. INITCAP applied."
         tests:
+          - not_null
           - accepted_values:
               values: ['Single', 'Married', 'Divorced']
 
@@ -58,17 +103,26 @@ models:
       # Education
       # -------------------------------------------------------
       - name: education_level
-        description: "Education level as INT 1-5."
+        description: "Education level code as INT 1-5."
         tests:
           - not_null
           - accepted_values:
-              values: [1, 2, 3, 4, 5]     # integers — not strings like bronze
+              values: [1, 2, 3, 4, 5]
+          - relationships:
+              to: ref('seed_education_level')
+              field: education_level
 
-      - name: education_level_label
-        description: "Decoded education label. Derived from education_level in silver transformation."
+      - name: education_label
+        description: "Decoded education label from seed_education_level."
         tests:
+          - not_null
           - accepted_values:
               values: ['Below College', 'College', 'Bachelor', 'Master', 'Doctor']
+
+      - name: education_description
+        description: "Full description from seed_education_level."
+        tests:
+          - not_null
 
       - name: education_field
         description: "Field of education."
@@ -76,23 +130,24 @@ models:
           - not_null
 
       # -------------------------------------------------------
-      # Job and organisation
+      # Organisation
       # -------------------------------------------------------
+      - name: department
+        description: "Employee department."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Research & Development', 'Sales', 'Human Resources']
+
       - name: job_role
         description: "Job role title."
         tests:
           - not_null
-          - accepted_values:
-              values:
-                - 'Healthcare Representative'
-                - 'Human Resources'
-                - 'Laboratory Technician'
-                - 'Manager'
-                - 'Manufacturing Director'
-                - 'Research Director'
-                - 'Research Scientist'
-                - 'Sales Executive'
-                - 'Sales Representative'
+
+      - name: job_title
+        description: "Specific job title. More granular than job_role."
+        tests:
+          - not_null
 
       - name: job_level
         description: "Job level as INT 1-5."
@@ -100,38 +155,213 @@ models:
           - not_null
           - accepted_values:
               values: [1, 2, 3, 4, 5]
+          - relationships:
+              to: ref('seed_job_level')
+              field: job_level
 
-      - name: department
-        description: "Employee department."
+      - name: job_level_label
+        description: "Decoded job level label from seed_job_level."
         tests:
           - not_null
           - accepted_values:
-              values: ['Human Resources', 'Research & Development', 'Sales']
+              values: ['Junior', 'Mid', 'Senior', 'Lead', 'Principal']
+
+      - name: job_role_level
+        description: "Derived display label — job_role || L || job_level."
+        tests:
+          - not_null
 
       - name: business_travel
         description: >
           Standardised travel frequency.
-          TravelRarely from bronze is merged into Travel_Rarely here.
-          If TravelRarely appears in this column the silver cleaning logic broke.
+          CASE statement cleaned dirty values before seed join.
         tests:
           - not_null
           - accepted_values:
               values: ['Travel_Rarely', 'Travel_Frequently', 'Non-Travel']
-              # TravelRarely deliberately excluded — should never appear after cleaning
+          - relationships:
+              to: ref('seed_business_travel')
+              field: business_travel
+
+      - name: travel_label
+        description: "Short label from seed_business_travel."
+        tests:
+          - not_null
+
+      - name: travel_description
+        description: "Full description from seed_business_travel."
+        tests:
+          - not_null
+
+      - name: employment_type
+        description: "Employment type."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Full Time', 'Part Time', 'Contract']
+          - relationships:
+              to: ref('seed_employment_type')
+              field: employment_type
+
+      - name: employment_type_code
+        description: "Short code from seed_employment_type."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['FT', 'PT', 'CT']
+
+      - name: is_full_time
+        description: "Boolean flag from seed_employment_type. TRUE for Full Time only."
+        tests:
+          - not_null
+
+      - name: location
+        description: "City where employee works."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('seed_location')
+              field: location
+
+      - name: state
+        description: "US state from seed_location."
+        tests:
+          - not_null
+
+      - name: region
+        description: "US region from seed_location."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Northeast', 'West', 'Southeast', 'Midwest', 'South', 'Southwest']
+
+      - name: cost_center
+        description: "Department budget code."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['CC-RD-001', 'CC-SL-002', 'CC-HR-003']
+
+      - name: recruitment_source
+        description: "Recruitment channel."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['LinkedIn', 'Employee Referral', 'Job Board', 'Campus Recruitment', 'Staffing Agency']
+          - relationships:
+              to: ref('seed_recruitment_source')
+              field: recruitment_source
+
+      - name: recruitment_category
+        description: "Recruitment channel category from seed_recruitment_source."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Digital', 'Internal', 'External', 'Direct']
+
+      - name: recruitment_cost
+        description: "Relative recruitment cost from seed_recruitment_source."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Low', 'Medium', 'High']
+
+      # -------------------------------------------------------
+      # Dates
+      # -------------------------------------------------------
+      - name: join_date
+        description: "Date employee joined. Cast from DD-MM-YYYY to DATE."
+        tests:
+          - not_null
+
+      - name: last_promotion_date
+        description: "Date of last promotion. Cast from DD-MM-YYYY to DATE."
+        tests:
+          - not_null
+
+      - name: exit_date
+        description: "Date employee left. NULL for active employees."
+
+      - name: snapshot_date
+        description: "Snapshot period date. All rows 2024-01-01."
+        tests:
+          - not_null
+
+      - name: tenure_years
+        description: "Years between join_date and snapshot_date."
+        tests:
+          - not_null
+
+      - name: tenure_months
+        description: "Months between join_date and snapshot_date."
+        tests:
+          - not_null
+
+      - name: months_before_exit
+        description: "Months between join_date and exit_date. NULL for active employees."
+
+      - name: months_since_last_promotion
+        description: "Months between last_promotion_date and snapshot_date."
+        tests:
+          - not_null
+
+      # -------------------------------------------------------
+      # Flags
+      # -------------------------------------------------------
+      - name: attrition_flag
+        description: "Whether employee left. Converted from Yes/No to BOOLEAN."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [true, false]
+
+      - name: overtime_flag
+        description: "Whether employee works overtime. Converted from Yes/No to BOOLEAN."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [true, false]
+
+      - name: termination_reason
+        description: "Reason employee left. NULL for active employees."
+        tests:
+          - relationships:
+              to: ref('seed_termination_reason')
+              field: termination_reason
+
+      - name: termination_category
+        description: "High level category from seed. NULL for active employees."
+
+      - name: is_voluntary
+        description: "Whether departure was voluntary. NULL for active employees."
 
       # -------------------------------------------------------
       # Compensation
       # -------------------------------------------------------
       - name: monthly_income
-        description: "Monthly income as INT. Rows with zero or null income rejected in transformation."
+        description: "Monthly income as INT. Greater than zero."
         tests:
           - not_null
 
       - name: salary_slab
         description: "Salary band."
         tests:
+          - not_null
           - accepted_values:
               values: ['Upto 5k', '5k-10k', '10k-15k', '15k+']
+          - relationships:
+              to: ref('seed_salary_slab')
+              field: salary_slab
+
+      - name: salary_slab_min
+        description: "Minimum income for this band from seed_salary_slab."
+        tests:
+          - not_null
+
+      - name: salary_slab_max
+        description: "Maximum income for this band from seed_salary_slab."
+        tests:
+          - not_null
 
       - name: daily_rate
         description: "Daily rate as INT."
@@ -144,93 +374,150 @@ models:
           - not_null
 
       - name: monthly_rate
-        description: "Monthly rate as INT."
+        description: "Internal billing rate as INT."
         tests:
           - not_null
 
       - name: percent_salary_hike
-        description: "Salary hike percentage as INT."
+        description: "Last salary hike percentage as INT."
         tests:
           - not_null
 
       - name: stock_option_level
         description: "Stock option level as INT 0-3."
         tests:
+          - not_null
           - accepted_values:
               values: [0, 1, 2, 3]
+          - relationships:
+              to: ref('seed_stock_option_level')
+              field: stock_option_level
+
+      - name: stock_option_label
+        description: "Stock option label from seed_stock_option_level."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['None', 'Low', 'Medium', 'High']
+
+      - name: stock_option_description
+        description: "Stock option description from seed_stock_option_level."
+        tests:
+          - not_null
 
       # -------------------------------------------------------
-      # Survey scores — per employee, go to fact table not dims
+      # Survey scores
       # -------------------------------------------------------
-      - name: job_satisfaction
-        description: "Job satisfaction rating 1-4. Per-employee survey score. Goes to fact_employee_snapshot not a dimension."
+      - name: performance_rating
+        description: "Performance rating as INT 1-4."
         tests:
           - not_null
           - accepted_values:
               values: [1, 2, 3, 4]
+          - relationships:
+              to: ref('seed_rating_scale')
+              field: rating_value
+
+      - name: performance_rating_label
+        description: "Rating label from seed_rating_scale."
+        tests:
+          - not_null
 
       - name: environment_satisfaction
-        description: "Environment satisfaction rating 1-4. Per-employee survey score."
+        description: "Environment satisfaction as INT 1-4."
         tests:
           - not_null
           - accepted_values:
               values: [1, 2, 3, 4]
+          - relationships:
+              to: ref('seed_rating_scale')
+              field: rating_value
+
+      - name: environment_satisfaction_label
+        description: "Rating label from seed_rating_scale."
+        tests:
+          - not_null
+
+      - name: job_satisfaction
+        description: "Job satisfaction as INT 1-4."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4]
+          - relationships:
+              to: ref('seed_rating_scale')
+              field: rating_value
+
+      - name: job_satisfaction_label
+        description: "Rating label from seed_rating_scale."
+        tests:
+          - not_null
 
       - name: relationship_satisfaction
-        description: "Relationship satisfaction rating 1-4. Per-employee survey score."
+        description: "Relationship satisfaction as INT 1-4."
         tests:
           - not_null
           - accepted_values:
               values: [1, 2, 3, 4]
+          - relationships:
+              to: ref('seed_rating_scale')
+              field: rating_value
+
+      - name: relationship_satisfaction_label
+        description: "Rating label from seed_rating_scale."
+        tests:
+          - not_null
 
       - name: work_life_balance
-        description: "Work life balance rating 1-4. Per-employee survey score."
+        description: "Work life balance as INT 1-4."
         tests:
           - not_null
           - accepted_values:
               values: [1, 2, 3, 4]
+          - relationships:
+              to: ref('seed_rating_scale')
+              field: rating_value
+
+      - name: work_life_balance_label
+        description: "Rating label from seed_rating_scale."
+        tests:
+          - not_null
 
       - name: job_involvement
-        description: "Job involvement rating 1-4. Per-employee survey score. Not a property of the job role."
+        description: "Job involvement as INT 1-4."
         tests:
           - not_null
           - accepted_values:
               values: [1, 2, 3, 4]
+          - relationships:
+              to: ref('seed_rating_scale')
+              field: rating_value
 
-      - name: performance_rating
-        description: "Performance rating 1-4."
+      - name: job_involvement_label
+        description: "Rating label from seed_rating_scale."
         tests:
           - not_null
-          - accepted_values:
-              values: [1, 2, 3, 4]
 
-      # -------------------------------------------------------
-      # Flags — converted from Yes/No string to boolean
-      # -------------------------------------------------------
-      - name: attrition_flag
-        description: "Whether employee left. Converted from Yes/No string in bronze to boolean here."
+      - name: overall_engagement_score
+        description: "Average of all five survey measures. Range 1.0 to 4.0."
         tests:
           - not_null
-          - accepted_values:
-              values: [true, false]
-
-      - name: overtime_flag
-        description: "Whether employee works overtime. Converted from Yes/No string in bronze to boolean here."
-        tests:
-          - not_null
-          - accepted_values:
-              values: [true, false]
 
       # -------------------------------------------------------
-      # Tenure measures
+      # Tenure source measures
       # -------------------------------------------------------
-      - name: total_working_years
-        description: "Total years of work experience as INT."
+      - name: distance_from_home
+        description: "Distance from home in miles as INT."
         tests:
           - not_null
 
       - name: num_companies_worked
         description: "Number of previous companies as INT."
+        tests:
+          - not_null
+
+      - name: total_working_years
+        description: "Total years of work experience as INT."
         tests:
           - not_null
 
@@ -255,23 +542,22 @@ models:
           - not_null
 
       - name: training_times_last_year
-        description: "Number of training sessions attended last year as INT."
-        tests:
-          - not_null
-
-      - name: distance_from_home
-        description: "Distance from home as INT."
+        description: "Training sessions last year as INT."
         tests:
           - not_null
 
       # -------------------------------------------------------
-      # Pipeline metadata — carried from bronze
+      # Pipeline metadata
       # -------------------------------------------------------
       - name: _source_file_name
-        description: "S3 file path from Snowpipe. Carried from bronze for lineage tracking."
+        description: "S3 file path carried from bronze."
+        tests:
+          - not_null
 
       - name: _load_timestamp
-        description: "Snowpipe load timestamp from bronze."
+        description: "Load timestamp carried from bronze."
+        tests:
+          - not_null
 
       - name: _silver_created_at
         description: "Timestamp when this row was written to silver."

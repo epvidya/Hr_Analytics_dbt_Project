@@ -1,4 +1,8 @@
 # models/staging/sources.yml
+# Staging layer — raw landing zone from S3 via COPY INTO
+# No tests here — whatever arrives from S3 lands untouched
+# All 52 CSV columns documented + 2 metadata columns
+# Tests and validation start in bronze
 
 version: 2
 
@@ -6,27 +10,62 @@ sources:
   - name: staging
     database: hr_analytics_dbt
     schema: staging
-    description: "Raw Snowpipe landing zone. CSV loaded directly from S3. All columns VARCHAR. No tests — whatever arrives from S3 lands here untouched."
+    description: >
+      Raw landing zone for HR Analytics data.
+      CSV loaded from S3 using COPY INTO with file format ff_csv.
+      All 52 columns stored as VARCHAR regardless of actual data type.
+      Two metadata columns injected by COPY INTO — not in original CSV.
+      Dates are in DD-MM-YYYY format.
+      NULL values expected in manager_id (level 5 employees),
+      exit_date and termination_reason (active employees).
 
     tables:
       - name: hr_data_raw
         description: >
-          Raw HR employee data landed from S3 via Snowpipe.
-          All 41 columns are VARCHAR regardless of actual data type.
-          Three date columns added vs original CSV: join_date, exit_date, snapshot_date.
-          Known dirty value: business_travel contains both TravelRarely and Travel_Rarely.
-          Constant columns present: employee_count always 1, over_18 always Y, standard_hours always 80.
-          exit_date is NULL for active employees — only populated when attrition = Yes.
+          Raw HR employee snapshot data — 200 rows, 52 columns.
+          One row per employee representing their status as of SnapshotDate 01-01-2024.
+          New columns vs original Kaggle dataset:
+          ManagerID, FirstName, LastName, Email, JobTitle,
+          EmploymentType, Location, CostCenter, RecruitmentSource,
+          LastPromotionDate, TerminationReason.
+          Constant columns present — EmployeeCount always 1,
+          Over18 always Y, StandardHours always 80. Dropped in silver.
 
         columns:
+
+          # -------------------------------------------------------
+          # Identity
+          # -------------------------------------------------------
           - name: emp_id
-            description: "Employee unique identifier. Natural key. Format RM001 to RM999."
+            description: "Employee unique identifier. Format RM001 to RM200. Natural key for all downstream joins."
 
           - name: employee_number
-            description: "Numeric employee identifier. Different from emp_id."
+            description: "Sequential numeric employee identifier. Different from emp_id."
 
+          - name: manager_id
+            description: >
+              Employee ID of this employee's direct manager.
+              References emp_id of another row in the same table — self referencing.
+              NULL for Level 5 employees who are top of the org hierarchy.
+              Used to build dim_manager via self join in silver.
+
+          # -------------------------------------------------------
+          # Personal details
+          # -------------------------------------------------------
+          - name: first_name
+            description: "Employee first name."
+
+          - name: last_name
+            description: "Employee last name."
+
+          - name: email
+            description: "Employee work email. Format firstname.lastname@hranalytics.com."
+
+          # -------------------------------------------------------
+          # Demographics
+          # -------------------------------------------------------
           - name: age
-            description: "Employee age as VARCHAR. Range 18 to 60. Cast to INT in silver."
+            description: "Employee age as VARCHAR. Range 22 to 58. Cast to INT in silver."
 
           - name: age_group
             description: "Age bracket as VARCHAR. Values: 18-25, 26-35, 36-45, 46-55, 55+"
@@ -37,47 +76,128 @@ sources:
           - name: marital_status
             description: "Marital status as VARCHAR. Values: Single, Married, Divorced."
 
-          - name: over_18
-            description: "Always Y. Constant column. Dropped in silver."
-
+          # -------------------------------------------------------
+          # Education
+          # -------------------------------------------------------
           - name: education
-            description: "Education level code as VARCHAR. Values: 1-5. Decoded to label in silver."
+            description: >
+              Education level code as VARCHAR. Values 1-5.
+              1=Below College, 2=College, 3=Bachelor, 4=Master, 5=Doctor.
+              Decoded to label in silver via seed_education_level join.
 
           - name: education_field
-            description: "Field of education as VARCHAR. Values: Life Sciences, Medical, Marketing, Technical Degree, Other, Human Resources."
+            description: >
+              Field of education as VARCHAR.
+              Values: Life Sciences, Medical, Marketing,
+              Technical Degree, Other, Human Resources.
 
+          # -------------------------------------------------------
+          # Organisation
+          # -------------------------------------------------------
           - name: department
             description: "Employee department as VARCHAR. Values: Research & Development, Sales, Human Resources."
 
           - name: job_role
-            description: "Job role title as VARCHAR. Values: Laboratory Technician, Research Scientist, Sales Executive etc."
+            description: >
+              Job role title as VARCHAR.
+              Values: Laboratory Technician, Research Scientist,
+              Manufacturing Director, Healthcare Representative,
+              Research Director, Manager, Sales Representative,
+              Sales Executive, Human Resources.
+              Used with job_level to build dim_job_role in gold.
+
+          - name: job_title
+            description: >
+              Specific job title as VARCHAR. More granular than job_role.
+              Example: Research Scientist II, Senior Sales Executive.
+              Stored in dim_employee — not used for dimensional grouping.
 
           - name: job_level
-            description: "Job level as VARCHAR. Values: 1-5. Used with job_role to build dim_job_role in gold."
+            description: >
+              Job level as VARCHAR. Values: 1-5.
+              1=Junior, 2=Mid, 3=Senior, 4=Lead, 5=Principal.
+              Used with job_role to build dim_job_role in gold.
 
           - name: business_travel
             description: >
               Travel frequency as VARCHAR.
-              DIRTY SOURCE — contains both TravelRarely and Travel_Rarely meaning the same thing.
-              Standardised to Travel_Rarely in silver. No test here — dirty values are expected.
+              Values: Travel_Rarely, Travel_Frequently, Non-Travel.
+              Clean in this dataset — no dirty values.
+              Standardised in silver using CASE statement as defensive measure.
 
+          - name: employment_type
+            description: "Employment type as VARCHAR. Values: Full Time, Part Time, Contract."
+
+          - name: location
+            description: >
+              City where employee works as VARCHAR.
+              R&D: Boston, San Diego, Seattle, Raleigh.
+              Sales: New York, Chicago, Dallas, Atlanta.
+              HR: Phoenix, Denver, Austin.
+
+          - name: cost_center
+            description: >
+              Department budget code as VARCHAR.
+              CC-RD-001 for Research & Development.
+              CC-SL-002 for Sales.
+              CC-HR-003 for Human Resources.
+
+          - name: recruitment_source
+            description: >
+              How employee was recruited as VARCHAR.
+              Values: LinkedIn, Employee Referral, Job Board,
+              Campus Recruitment, Staffing Agency.
+
+          # -------------------------------------------------------
+          # Dates — all DD-MM-YYYY format
+          # -------------------------------------------------------
           - name: join_date
-            description: "Date employee joined the company as VARCHAR. Format DD-MM-YYYY. Cast to DATE in silver. Range 2010 to 2022."
+            description: >
+              Date employee joined the company as VARCHAR. Format DD-MM-YYYY.
+              Range 2010 to 2022. Cast to DATE in silver.
+              Used to calculate tenure_years and tenure_months via DATEDIFF.
+
+          - name: last_promotion_date
+            description: >
+              Date of employee's last promotion as VARCHAR. Format DD-MM-YYYY.
+              Always populated — no NULLs.
+              Cast to DATE in silver. Used with snapshot_date for promotion cycle analysis.
 
           - name: exit_date
-            description: "Date employee left the company as VARCHAR. Format DD-MM-YYYY. NULL for active employees. Only populated when attrition = Yes."
+            description: >
+              Date employee left the company as VARCHAR. Format DD-MM-YYYY.
+              NULL for active employees — 169 NULLs expected.
+              Only populated when attrition = Yes.
+              Cast to DATE in silver. Used to calculate months_before_exit.
+
+          - name: termination_reason
+            description: >
+              Reason employee left as VARCHAR.
+              NULL for active employees — 169 NULLs expected.
+              Values: Resigned, Better Opportunity, Personal Reasons,
+              Involuntary Termination, Retirement.
+              Only populated when attrition = Yes.
 
           - name: snapshot_date
-            description: "Point in time this record represents as VARCHAR. Format DD-MM-YYYY. All rows 2024-01-01 in current dataset."
+            description: >
+              Point in time this record represents as VARCHAR. Format DD-MM-YYYY.
+              All rows 01-01-2024 in current dataset.
+              Maps to dim_date via date_sk in gold fact table.
 
+          # -------------------------------------------------------
+          # Flags
+          # -------------------------------------------------------
           - name: attrition
-            description: "Whether employee left as VARCHAR. Values: Yes, No."
+            description: "Whether employee left as VARCHAR. Values: Yes, No. Converted to BOOLEAN in silver."
 
           - name: overtime
-            description: "Whether employee works overtime as VARCHAR. Values: Yes, No."
+            description: "Whether employee works overtime as VARCHAR. Values: Yes, No. Converted to BOOLEAN in silver."
 
+          # -------------------------------------------------------
+          # Compensation
+          # -------------------------------------------------------
           - name: monthly_income
-            description: "Monthly income as VARCHAR. Cast to INT in silver. Range 1009 to 19999."
+            description: "Monthly take home salary as VARCHAR. Cast to INT in silver. Range varies by job level."
 
           - name: salary_slab
             description: "Salary band as VARCHAR. Values: Upto 5k, 5k-10k, 10k-15k, 15k+"
@@ -89,32 +209,43 @@ sources:
             description: "Hourly rate as VARCHAR. Cast to INT in silver. Range 30 to 100."
 
           - name: monthly_rate
-            description: "Monthly rate as VARCHAR. Cast to INT in silver. Range 2094 to 26999."
+            description: >
+              Internal billing rate as VARCHAR. Cast to INT in silver.
+              Not the same as monthly_income — represents cost to company
+              including benefits and overhead.
 
           - name: percent_salary_hike
-            description: "Salary hike percentage as VARCHAR. Cast to INT in silver. Range 11 to 25."
+            description: "Last salary hike percentage as VARCHAR. Cast to INT in silver. Range 11 to 25."
 
           - name: stock_option_level
-            description: "Stock option level as VARCHAR. Values: 0, 1, 2, 3."
+            description: "Stock option level as VARCHAR. Values: 0, 1, 2, 3. Decoded to label via seed join in silver."
 
+          # -------------------------------------------------------
+          # Performance and survey scores
+          # -------------------------------------------------------
           - name: performance_rating
-            description: "Performance rating as VARCHAR. Values: 1-4."
+            description: >
+              Annual performance rating as VARCHAR. Values: 3, 4 only in this dataset.
+              Goes to fact_employee_snapshot — not a dimension attribute.
 
           - name: environment_satisfaction
-            description: "Environment satisfaction rating as VARCHAR. Values: 1-4. Per-employee survey score — goes to fact table not dim."
+            description: "Environment satisfaction survey score as VARCHAR. Values: 1-4. Per employee — goes to fact table not dim."
 
           - name: job_satisfaction
-            description: "Job satisfaction rating as VARCHAR. Values: 1-4. Per-employee survey score — goes to fact table not dim."
+            description: "Job satisfaction survey score as VARCHAR. Values: 1-4. Per employee — goes to fact table not dim."
 
           - name: relationship_satisfaction
-            description: "Relationship satisfaction rating as VARCHAR. Values: 1-4. Per-employee survey score — goes to fact table not dim."
+            description: "Relationship satisfaction survey score as VARCHAR. Values: 1-4. Per employee — goes to fact table not dim."
 
           - name: work_life_balance
-            description: "Work life balance rating as VARCHAR. Values: 1-4. Per-employee survey score — goes to fact table not dim."
+            description: "Work life balance survey score as VARCHAR. Values: 1-4. Per employee — goes to fact table not dim."
 
           - name: job_involvement
-            description: "Job involvement rating as VARCHAR. Values: 1-4. Per-employee survey score — goes to fact table not dim."
+            description: "Job involvement survey score as VARCHAR. Values: 1-4. Per employee — goes to fact table not dim."
 
+          # -------------------------------------------------------
+          # Tenure measures
+          # -------------------------------------------------------
           - name: distance_from_home
             description: "Distance from home in miles as VARCHAR. Cast to INT in silver. Range 1 to 29."
 
@@ -122,7 +253,7 @@ sources:
             description: "Number of previous companies as VARCHAR. Cast to INT in silver. Range 0 to 9."
 
           - name: total_working_years
-            description: "Total years of work experience as VARCHAR. Cast to INT in silver. Range 0 to 40."
+            description: "Total years of work experience as VARCHAR. Cast to INT in silver."
 
           - name: years_at_company
             description: "Years at current company as VARCHAR. Pre-calculated by source system. Cast to INT in silver."
@@ -131,22 +262,31 @@ sources:
             description: "Years in current role as VARCHAR. Cast to INT in silver. Range 0 to 18."
 
           - name: years_since_last_promotion
-            description: "Years since last promotion as VARCHAR. Cast to INT in silver. Range 0 to 15."
+            description: "Years since last promotion as VARCHAR. Cast to INT in silver. Range 0 to 10."
 
           - name: years_with_curr_manager
             description: "Years with current manager as VARCHAR. Cast to INT in silver. Range 0 to 17."
 
           - name: training_times_last_year
-            description: "Number of training sessions last year as VARCHAR. Cast to INT in silver. Range 0 to 6."
+            description: "Number of training sessions attended last year as VARCHAR. Cast to INT in silver. Range 0 to 6."
 
+          # -------------------------------------------------------
+          # Constant columns — always same value, dropped in silver
+          # -------------------------------------------------------
           - name: employee_count
-            description: "Always 1. Constant column. Dropped in silver."
+            description: "Always 1. Constant column. Dropped in silver — no analytical value."
+
+          - name: over_18
+            description: "Always Y. Constant column. Dropped in silver — no analytical value."
 
           - name: standard_hours
-            description: "Always 80. Constant column. Dropped in silver."
+            description: "Always 80. Constant column. Dropped in silver — no analytical value."
 
+          # -------------------------------------------------------
+          # Pipeline metadata — injected by COPY INTO, not in CSV
+          # -------------------------------------------------------
           - name: _source_file_name
-            description: "S3 file path injected by COPY INTO using METADATA$FILENAME. Not in original CSV."
+            description: "S3 file path injected by COPY INTO using METADATA$FILENAME. Format: s3://hr-data-raw/hr_analytics_final.csv"
 
           - name: _load_timestamp
-            description: "Timestamp when row was loaded into staging. Injected by COPY INTO using CURRENT_TIMESTAMP(). Not in original CSV."
+            description: "Timestamp when COPY INTO ran. Injected using CURRENT_TIMESTAMP(). TIMESTAMP_NTZ — no timezone."

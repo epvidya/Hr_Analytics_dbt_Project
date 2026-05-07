@@ -1,0 +1,4 @@
+employment_type,employment_type_code,is_full_time
+Full Time,FT,true
+Part Time,PT,false
+Contract,CT,false

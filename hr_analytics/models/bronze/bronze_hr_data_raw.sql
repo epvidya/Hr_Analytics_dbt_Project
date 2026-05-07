@@ -1,7 +1,14 @@
+{{ config(materialized='view') }}
+
 with base as (
 
     select
         emp_id,
+        employee_number,
+        manager_id,
+        first_name,
+        last_name,
+        email,
         age,
         age_group,
         gender,
@@ -10,10 +17,17 @@ with base as (
         education_field,
         department,
         job_role,
+        job_title,
         job_level,
         business_travel,
+        employment_type,
+        location,
+        cost_center,
+        recruitment_source,
         join_date,
+        last_promotion_date,
         exit_date,
+        termination_reason,
         snapshot_date,
         attrition,
         overtime,
@@ -39,7 +53,6 @@ with base as (
         years_with_curr_manager,
         training_times_last_year,
         employee_count,
-        employee_number,
         over_18,
         standard_hours,
         _source_file_name,
