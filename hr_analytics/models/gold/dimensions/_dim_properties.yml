@@ -1,0 +1,148 @@
+version: 2
+
+models:
+
+  - name: dim_date
+    description: "Date dimension. One row per calendar day 2010-01-01 to 2030-12-31. SK is YYYYMMDD integer."
+    columns:
+
+      - name: date_sk
+        tests:
+          - not_null
+          - unique
+
+      - name: full_date
+        tests:
+          - not_null
+          - unique
+
+      - name: is_weekend
+        tests:
+          - not_null
+          - accepted_values:
+              values: [true, false]
+
+      - name: is_workday
+        tests:
+          - not_null
+          - accepted_values:
+              values: [true, false]
+
+      - name: is_holiday
+        tests:
+          - not_null
+
+
+  - name: dim_employee
+    description: "Employee dimension. One row per employee. SCD2 ready."
+    columns:
+
+      - name: employee_sk
+        tests:
+          - not_null
+          - unique
+
+      - name: emp_id
+        tests:
+          - not_null
+          - unique
+
+      - name: join_date_sk
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_date')
+              field: date_sk
+
+      - name: is_current
+        tests:
+          - not_null
+
+      - name: valid_from
+        tests:
+          - not_null
+
+
+  - name: dim_manager
+    description: "Manager dimension. One row per manager. Built via self join on silver_hr_cleaned."
+    columns:
+
+      - name: manager_sk
+        tests:
+          - not_null
+          - unique
+
+      - name: manager_id
+        tests:
+          - not_null
+          - unique
+
+      - name: manager_emp_sk
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_employee')
+              field: employee_sk
+
+
+  - name: dim_job_role
+    description: "Job role dimension. One row per distinct job_role and job_level combination."
+    columns:
+
+      - name: job_role_sk
+        tests:
+          - not_null
+          - unique
+
+      - name: job_role
+        tests:
+          - not_null
+
+      - name: job_level
+        tests:
+          - not_null
+
+
+  - name: dim_org
+    description: "Organisation dimension. One row per distinct department and business_travel combination."
+    columns:
+
+      - name: org_sk
+        tests:
+          - not_null
+          - unique
+
+      - name: department
+        tests:
+          - not_null
+
+      - name: business_travel
+        tests:
+          - not_null
+
+
+  - name: dim_location
+    description: "Location dimension. One row per city. Includes state, region and cost center."
+    columns:
+
+      - name: location_sk
+        tests:
+          - not_null
+          - unique
+
+      - name: location
+        tests:
+          - not_null
+          - unique
+
+      - name: state
+        tests:
+          - not_null
+
+      - name: region
+        tests:
+          - not_null
+
+      - name: cost_center
+        tests:
+          - not_null
