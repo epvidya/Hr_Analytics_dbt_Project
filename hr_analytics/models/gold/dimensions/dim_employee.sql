@@ -46,6 +46,21 @@ final as (
         employment_type_code,
         is_full_time,
 
+        -- attrition and exit status
+        attrition_flag,
+        exit_date,
+
+        case
+            when attrition_flag = false and exit_date is null
+            then true
+            else false
+        end                                        as is_active_employee,
+
+        -- termination context (only populated if they left)
+        termination_reason,
+        termination_category,
+        is_voluntary,
+
         -- recruitment
         recruitment_source,
         recruitment_category,
