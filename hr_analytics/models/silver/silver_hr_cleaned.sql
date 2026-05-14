@@ -260,9 +260,10 @@ final as (
         b.overtime_flag,
 
         -- termination — LEFT JOIN so active employees pass through with NULLs
+      
         b.termination_reason,
-        tr.reason_category                                  AS termination_category,
-        tr.is_voluntary,
+        COALESCE(tr.reason_category, 'Active')          AS termination_category,
+        COALESCE(tr.is_voluntary, FALSE)                AS is_voluntary,
 
         -- compensation — measures + slab range from seed
         b.monthly_income,

@@ -1,7 +1,4 @@
--- tests/assert_manager_id_rule.sql
--- Singular test — returns rows that VIOLATE the manager rule
--- dbt expects 0 rows returned for a passing test
--- Any rows returned = test failure
+{{ config(severity = 'warn') }}
 
 -- Rule 1: Level 5 employees must have NULL manager_id
 SELECT

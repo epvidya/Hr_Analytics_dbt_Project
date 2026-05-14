@@ -43,7 +43,7 @@ models:
         description: "Manager employee ID. NULL for Level 5 employees."
         tests:
           - relationships:
-              to: ref('hr_cleaned')
+              to: ref('silver_hr_cleaned')
               field: emp_id
 
       # -------------------------------------------------------

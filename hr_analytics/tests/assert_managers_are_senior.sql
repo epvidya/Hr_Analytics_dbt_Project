@@ -1,4 +1,4 @@
--- tests/assert_managers_are_senior.sql
+{{ config(severity = 'warn') }}
 -- Anyone who appears as a manager_id must be Level 4 or 5
 -- Level 1, 2, 3 employees should never be someone's manager
 

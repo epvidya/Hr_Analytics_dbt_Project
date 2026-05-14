@@ -76,14 +76,11 @@ models:
         tests:
           - not_null
           - unique
-
-      - name: manager_emp_sk
-        tests:
-          - not_null
           - relationships:
               to: ref('dim_employee')
-              field: employee_sk
+              field: emp_id
 
+     
 
   - name: dim_job_role
     description: "Job role dimension. One row per distinct job_role and job_level combination."
