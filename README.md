@@ -8,9 +8,9 @@ End-to-end HR Analytics data pipeline built on Snowflake using dbt. Implements M
 
 ## Architecture
 
-
+```
 S3 → COPY INTO → Staging → Bronze (dbt view) → Silver (dbt table) → Gold (Star Schema)
-
+```
 
 ## Tech Stack
 
@@ -94,7 +94,7 @@ Raw view on top of staging table. All 52 columns remain VARCHAR — no transform
 
 ## Project Structure
 
-
+```
 hr_analytics/
 ├── models/
 │   ├── staging/sources.yml
@@ -109,7 +109,7 @@ hr_analytics/
 ├── macros/
 ├── packages.yml
 └── dbt_project.yml
-
+```
 
 ## How to Run
 
