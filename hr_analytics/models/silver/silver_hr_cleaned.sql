@@ -109,13 +109,24 @@ base as (
         TRY_TO_DATE(snapshot_date,       'DD-MM-YYYY')      AS snapshot_date,
 
         -- derived date measures
+      
         DATEDIFF('year',
-            TRY_TO_DATE(join_date,     'DD-MM-YYYY'),
-            TRY_TO_DATE(snapshot_date, 'DD-MM-YYYY'))       AS tenure_years,
+            TRY_TO_DATE(join_date, 'DD-MM-YYYY'),
+            CASE
+                WHEN TRY_TO_DATE(exit_date, 'DD-MM-YYYY') IS NOT NULL
+                THEN TRY_TO_DATE(exit_date, 'DD-MM-YYYY')
+                ELSE TRY_TO_DATE(snapshot_date, 'DD-MM-YYYY')
+            END
+        )                                                       AS tenure_years,
 
         DATEDIFF('month',
-            TRY_TO_DATE(join_date,     'DD-MM-YYYY'),
-            TRY_TO_DATE(snapshot_date, 'DD-MM-YYYY'))       AS tenure_months,
+            TRY_TO_DATE(join_date, 'DD-MM-YYYY'),
+            CASE
+                WHEN TRY_TO_DATE(exit_date, 'DD-MM-YYYY') IS NOT NULL
+                THEN TRY_TO_DATE(exit_date, 'DD-MM-YYYY')
+                ELSE TRY_TO_DATE(snapshot_date, 'DD-MM-YYYY')
+            END
+        )                                                       AS tenure_months,
 
         -- NULL for active employees
         DATEDIFF('month',
