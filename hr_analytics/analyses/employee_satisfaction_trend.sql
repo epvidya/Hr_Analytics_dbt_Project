@@ -1,5 +1,6 @@
-with monthly_scores as (
-
+--analysis: employee_satisfaction_trend
+-- This analysis tracks employee job satisfaction and overall engagement scores over time, 
+-- calculating month-over-month changes and trends for each employee.
     select
         e.emp_id,
         e.full_name,

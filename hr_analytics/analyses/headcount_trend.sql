@@ -14,6 +14,7 @@ with joined as (
         j.job_level,
         j.job_level_label,
         l.region,
+        d.snapshot_date_sk,
         d.calendar_year,
         d.month_number,
         d.month_name,
@@ -40,25 +41,19 @@ aggregated as (
         job_level,
         job_level_label,
         region,
+        snapshot_date_sk,
         calendar_year,
         month_number,
         month_name,
         month_year,
 
-        -- headcount metrics
         COUNT(*)                                                AS total_headcount,
         SUM(CASE WHEN attrition_flag = false THEN 1 END)        AS active_headcount,
         SUM(CASE WHEN attrition_flag = true  THEN 1 END)        AS attrited_headcount,
-
-        -- fte headcount — full time employees only
         SUM(CASE WHEN is_full_time = true
                  AND attrition_flag = false THEN 1 END)         AS fte_headcount,
-
-        -- part time and contract
         SUM(CASE WHEN is_full_time = false
                  AND attrition_flag = false THEN 1 END)         AS non_fte_headcount,
-
-        -- overtime headcount
         SUM(CASE WHEN overtime_flag = true
                  AND attrition_flag = false THEN 1 END)         AS overtime_headcount
 
@@ -68,6 +63,7 @@ aggregated as (
         job_level,
         job_level_label,
         region,
+        snapshot_date_sk,
         calendar_year,
         month_number,
         month_name,
@@ -78,7 +74,7 @@ aggregated as (
 select *
 from aggregated
 order by
-    department,
     calendar_year,
     month_number,
+    department,
     job_level;

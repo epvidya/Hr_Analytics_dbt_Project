@@ -1,5 +1,11 @@
+--analysis: department_job_satisfaction_trend
+-- This analysis calculates the average, minimum, and maximum job satisfaction scores for each department over time, along with the headcount for each department in each month. 
+-- The results are ordered by calendar year, month number, and department.
+
 SELECT
     o.department,
+    d.snapshot_date_sk,
+    d.month_year,
     d.calendar_year,
     d.month_number,
     d.month_name,
@@ -14,10 +20,12 @@ JOIN gold.dim_date d
     ON f.snapshot_date_sk   = d.date_sk
 GROUP BY
     o.department,
+    d.snapshot_date_sk,
+    d.month_year,
     d.calendar_year,
     d.month_number,
     d.month_name
 ORDER BY
-    o.department,
     d.calendar_year,
-    d.month_number;
+    d.month_number,
+    o.department;

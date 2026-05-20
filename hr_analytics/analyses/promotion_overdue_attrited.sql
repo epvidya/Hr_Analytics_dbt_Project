@@ -1,7 +1,6 @@
---analysis: employee_job_satisfaction_rank_per_month
--- This analysis ranks employees by their job satisfaction scores for each month. 
--- It includes employee details such as department, job role, job level, and performance ratings. 
--- The results are ordered by calendar year, month number, and job satisfaction score in descending order.
+-- analyses/promotion_overdue_attrited.sql
+-- Business question: Which employees who left had not been promoted in 3+ years?
+-- Use: Post mortem — did lack of promotion contribute to attrition?
 
 select
     e.emp_id,
@@ -10,13 +9,14 @@ select
     j.job_role,
     j.job_level,
     j.job_level_label,
+    f.years_since_last_promotion,
+    f.months_since_last_promotion,
+    f.tenure_years,
+    f.termination_reason,
+    f.termination_category,
+    f.is_voluntary,
     f.job_satisfaction,
     f.overall_engagement_score,
-    f.performance_rating,
-    f.performance_rating_label,
-    f.attrition_flag,
-    f.overtime_flag,
-    f.tenure_years,
     d.snapshot_date_sk,
     d.month_year,
     d.calendar_year,
@@ -33,7 +33,11 @@ join gold.dim_job_role j
 join gold.dim_date d
     on f.snapshot_date_sk   = d.date_sk
 
+where f.years_since_last_promotion  >= 3
+  and f.attrition_flag              = true
+
 order by
     d.calendar_year,
     d.month_number,
-    f.job_satisfaction desc;
+    f.is_voluntary desc,
+    f.years_since_last_promotion desc;

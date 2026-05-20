@@ -21,7 +21,11 @@ models:
       Seed INNER JOINs enforce allowed values for all lookup columns.
       termination_reason uses LEFT JOIN — NULL for active employees.
       Enriched with decoded labels and flags from seed tables.
-
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - emp_id
+            - snapshot_date
     columns:
 
       # -------------------------------------------------------
@@ -31,13 +35,13 @@ models:
         description: "Employee unique identifier. Uppercased and trimmed."
         tests:
           - not_null
-          - unique
+          
 
       - name: employee_number
         description: "Sequential numeric employee identifier as INT."
         tests:
           - not_null
-          - unique
+         
 
       - name: manager_id
         description: "Manager employee ID. NULL for Level 5 employees."
@@ -63,7 +67,7 @@ models:
         description: "Employee work email. Lowercased."
         tests:
           - not_null
-          - unique
+          
 
       - name: full_name
         description: "Derived full name — first_name || last_name."
