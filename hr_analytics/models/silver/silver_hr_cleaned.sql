@@ -1,4 +1,7 @@
-{{ config(materialized='table') }}
+{{ config(
+    materialized = 'incremental',
+    unique_key   = ['emp_id', 'snapshot_date']
+) }}
 
 with
 
@@ -395,3 +398,10 @@ final as (
 )
 
 select * from final
+
+{% if is_incremental() %}
+    where _load_timestamp > (
+        select max(_load_timestamp) 
+        from {{ this }}
+    )
+{% endif %}

@@ -15,7 +15,12 @@ models:
       No transformations — straight copy from staging.
       Generic not_null tests on columns that would break
       downstream joins and transformations if missing.
-
+      - name: bronze_hr_data_raw
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - emp_id
+            - snapshot_date
     columns:
 
       # -------------------------------------------------------
@@ -25,7 +30,7 @@ models:
         description: "Employee unique identifier. Natural key. Pipeline cannot function without this."
         tests:
           - not_null
-          - unique
+         
 
       - name: employee_number
         description: "Sequential numeric employee identifier as VARCHAR."
@@ -55,7 +60,7 @@ models:
         description: "Employee work email as VARCHAR."
         tests:
           - not_null
-          - unique
+         
 
       # -------------------------------------------------------
       # Demographics

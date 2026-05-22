@@ -121,9 +121,11 @@ final as (
 
     from source s
 
-    -- employee — INNER JOIN, every employee must exist in dim
-    join dim_employee e
-        on s.emp_id             = e.emp_id
+    -- employee — Left JOIN, scd2 implementation
+    left join dim_employee e
+    on  s.emp_id        = e.emp_id
+    and s.snapshot_date >= e.valid_from
+    and (e.valid_to is null or s.snapshot_date < e.valid_to)
 
     -- manager — LEFT JOIN, level 5 employees have no manager
     left join dim_manager m

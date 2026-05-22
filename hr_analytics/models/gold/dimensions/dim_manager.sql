@@ -1,52 +1,50 @@
-{{
-    config(
-        materialized='table',
-        schema='gold'
-    )
-}}
+{{ config(materialized='table', schema='gold') }}
 
 with source as (
-
     select * from {{ ref('silver_hr_cleaned') }}
+),
 
+-- latest snapshot per employee only
+latest as (
+    select *
+    from source
+    qualify row_number() over (
+        partition by emp_id
+        order by snapshot_date desc
+    ) = 1
 ),
 
 managers as (
-
     select distinct manager_id
     from source
     where manager_id is not null
-
 ),
 
 final as (
-
     select
-        {{ dbt_utils.generate_surrogate_key(['emp_id']) }}    as manager_sk,
-        m.emp_id                                                as manager_id,
-        m.first_name                                            as manager_first_name,
-        m.last_name                                             as manager_last_name,
-        m.full_name                                             as manager_full_name,
-        m.email                                                 as manager_email,
-        m.department,
-        m.job_role,
-        m.job_level,
-        m.job_level_label,
-        m.employment_type,
-        m.years_at_company,
-        m.years_with_curr_manager,
-        m.attrition_flag,
-        m.exit_date,
+        {{ dbt_utils.generate_surrogate_key(['l.emp_id']) }}    AS manager_sk,
+        l.emp_id                                                AS manager_id,
+        l.first_name                                            AS manager_first_name,
+        l.last_name                                             AS manager_last_name,
+        l.full_name                                             AS manager_full_name,
+        l.email                                                 AS manager_email,
+        l.department,
+        l.job_role,
+        l.job_level,
+        l.job_level_label,
+        l.employment_type,
+        l.years_at_company,
+        l.years_with_curr_manager,
+        l.attrition_flag,
+        l.exit_date,
         case
-            when m.attrition_flag = false and m.exit_date is null
-            then true
-            else false
-        end                                                     as is_active_manager,
-        current_timestamp()                                     as dbt_loaded_at
+            when l.attrition_flag = false and l.exit_date is null
+            then true else false
+        end                                                     AS is_active_manager,
+        current_timestamp()                                     AS dbt_loaded_at
 
     from managers mgr
-    inner join source m on mgr.manager_id = m.emp_id
-
+    inner join latest l on mgr.manager_id = l.emp_id
 )
 
 select * from final
