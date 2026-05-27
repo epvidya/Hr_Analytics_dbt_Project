@@ -21,8 +21,8 @@ S3 → COPY INTO → Staging → Bronze (dbt view) → Silver (dbt table) → Go
 - **Snowflake** — data warehouse (COPY INTO, Streams, Tasks, Dynamic Tables, Snowpipe, Time Travel, Zero-Copy Cloning)
 - **dbt** — transformations, testing, documentation, seed management, dbt_utils, incremental materialisation
 - **AWS S3** — raw file storage with storage integration and file format management
-- **Tableau** — HR analytics dashboards published to Tableau Public
-- **Python** — pandas for data generation, Streamlit in Snowflake for interactive dashboards
+- **Tableau** — 2 HR analytics dashboards (People Story + Compensation Story) published to Tableau Public
+- **Python** — pandas for synthetic data generation, Streamlit in Snowflake for interactive dashboards
 - **Git / GitHub** — version control with documented commit history
 
 ## Layers
@@ -104,12 +104,10 @@ Multi-page Streamlit in Snowflake app querying gold layer directly:
 
 ## Tableau Dashboards
 
-Published to Tableau Public — connecting to Snowflake gold layer analyses:
-- Attrition rate trends by department
-- Headcount and FTE breakdown
-- Compensation band distribution
-- Department satisfaction trends
-- Flight risk employee analysis
+Two dashboards published to Tableau Public — [view here](https://public.tableau.com/app/profile/vidya.egambaram.paramasivam/vizzes)
+
+- **Dashboard 1: People Story** — Attrition rate by department (bar chart, months sorted chronologically) + satisfaction trend by department with headcount in tooltip
+- **Dashboard 2: Compensation Story** — Salary distribution by band and job level + average salary by role and level + pay equity analysis with department and month filters
 
 ## Key Design Decisions
 

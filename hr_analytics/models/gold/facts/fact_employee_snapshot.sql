@@ -39,6 +39,8 @@ final as (
 
   
         e.employee_sk,
+        e.emp_id,
+        e.manager_id
         m.manager_sk,
         j.job_role_sk,
         o.org_sk,
